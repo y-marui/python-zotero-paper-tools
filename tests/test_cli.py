@@ -31,11 +31,19 @@ def test_deck_structure():
     assert len(slides) >= 5
 
 
+def test_deck_has_no_broken_image_links():
+    import re
+
+    text = note.build_deck(parse_entry(ENTRIES[0]))
+    uncommented = re.sub(r"<!--.*?-->", "", text, flags=re.S)
+    assert not re.search(r"!\[[^\]]*\]\([^)]*\)", uncommented)
+
+
 def test_note_creation(bbt_server, tmp_path, capsys):
     assert note.main(["--vault", str(tmp_path), "xu_probabilistic_2025"]) == 0
     path = tmp_path / "private/knowledge/xu_probabilistic_2025.md"
     assert path.is_file()
-    assert (tmp_path / "private/knowledge/xu_probabilistic_2025-img").is_dir()
+    assert not (tmp_path / "private/knowledge/xu_probabilistic_2025-img").exists()
     out = capsys.readouterr().out
     assert f"obsidian://open?vault={tmp_path.name}" in out
     # a second run must not overwrite

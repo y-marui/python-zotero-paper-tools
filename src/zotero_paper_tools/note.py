@@ -49,7 +49,8 @@ def build_deck(paper: Paper) -> str:
         "",
         "## 結果",
         "",
-        "![図の説明](" + f"{paper.citekey}-img/fig1.png" + ")",
+        f"<!-- 図は {paper.citekey}-img/ に置き、"
+        f"![図の説明]({paper.citekey}-img/ファイル名.png) で埋め込む -->",
         "",
         "---",
         "",
@@ -75,7 +76,6 @@ def create_note(paper: Paper, vault: Vault) -> Path:
     if path.exists():
         raise FileExistsError(f"note already exists: {path}")
     note_dir.mkdir(parents=True, exist_ok=True)
-    (note_dir / f"{paper.citekey}-img").mkdir(exist_ok=True)
     path.write_text(build_deck(paper), encoding="utf-8")
     return path
 
