@@ -6,7 +6,8 @@ import argparse
 import json
 import sys
 
-from .zotero import ZoteroError, search
+from .localapi import LocalApi
+from .zotero import Paper, ZoteroError, search
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -30,10 +31,19 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     if args.json:
+        api = LocalApi()
+
+        def pdf_key(p: Paper) -> str | None:
+            try:
+                return api.pdf_key(p)
+            except ZoteroError:
+                return None
+
         rows = [
             {
                 "citekey": p.citekey,
                 "zotero_key": p.item_key,
+                "pdf_key": pdf_key(p),
                 "title": p.title,
                 "authors": p.authors,
                 "year": p.year,

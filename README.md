@@ -1,5 +1,23 @@
 # python-zotero-paper-tools
 
+> **This is the reference (English) version.**
+> The canonical (Japanese) version is [README-jp.md](README-jp.md).
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/y-marui/python-zotero-paper-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/y-marui/python-zotero-paper-tools/actions/workflows/ci.yml)
+[![Charter Check](https://github.com/y-marui/python-zotero-paper-tools/actions/workflows/dev-charter-check.yml/badge.svg)](https://github.com/y-marui/python-zotero-paper-tools/actions/workflows/dev-charter-check.yml)
+[![GitHub Sponsors](https://img.shields.io/github/sponsors/y-marui?style=social)](https://github.com/sponsors/y-marui)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-donate-yellow.svg)](https://www.buymeacoffee.com/y.marui)
+
+| Field | Value |
+|---|---|
+| Target | CLI tools for Zotero and Obsidian users |
+| Team | Solo |
+| Language | English |
+| License | MIT |
+| AI Tools | Claude Code / GitHub Copilot / Gemini CLI |
+| Runtime | Python ^3.11 (standard library only), macOS (Keychain) |
+
 Small CLI tools that connect papers in [Zotero](https://www.zotero.org/) with
 slide-style Markdown discussion notes (a "deck") in an Obsidian vault.
 
@@ -11,7 +29,7 @@ endpoint. The Zotero Web API is never used. Python 3.11+, standard library only.
 
 | Command | Status | What it does |
 | --- | --- | --- |
-| `paper-find <query>` | available | Search Zotero and print citekeys |
+| `paper-find <query>` | available | Search Zotero and print citekeys (`--json` adds `zotero_key` and `pdf_key`) |
 | `paper-note <citekey>` | available | Create the deck in the vault |
 | `paper-link <citekey>` | available | Attach an `obsidian://` link to the Zotero item |
 
@@ -25,13 +43,26 @@ uv tool install .
 
 ## Configuration
 
-Personal settings are kept outside the repository. The vault is resolved in this
-order, and the command stops if none is found:
+Personal settings are kept outside the repository. The vault **root** is resolved
+in this order, and the command stops if none is found:
 
 1. `--vault DIR`
 2. environment variable `OBSIDIAN_VAULT_ROOT`
 3. `vault_root` in `~/.config/zotero-paper-tools/config.toml`
    (override the path with `ZOTERO_PAPER_TOOLS_CONFIG`)
+
+The vault **name** (the `vault=` part of `obsidian://` links) is resolved in this
+order:
+
+1. `--vault-name NAME` (`paper-note`, `paper-link`)
+2. environment variable `OBSIDIAN_VAULT_NAME`
+3. `vault_name` in the config, **only if the selected root is the config's
+   `vault_root`** (compared after `~` expansion and resolving symlinks, so
+   `~/v`, `/Users/me/v/` and a symlink to it count as the same root)
+4. the directory name of the selected root
+
+So overriding the root never silently reuses a name registered for another root.
+Set `vault_name` when the name registered in Obsidian differs from the directory name.
 
 ~~~toml
 # ~/.config/zotero-paper-tools/config.toml
@@ -45,12 +76,15 @@ vault_name = "my-vault"          # name registered in Obsidian; defaults to the 
 paper-find "spike-frequency adaptation"     # citekey, year, first author, title (tab separated)
 paper-find --json --limit 5 probabilistic   # JSON output
 
-paper-note xu_probabilistic_2025
+paper-note xu_probabilistic_2025            # add --private for the private area
 paper-link xu_probabilistic_2025
 ~~~
 
-`paper-note` writes `private/knowledge/<citekey>.md` in the vault, then prints the file path
-and its `obsidian://open` URI. It refuses to overwrite an existing note.
+`paper-note` writes `knowledge/research/papers/<citekey>.md` in the vault (with
+`--private`: `private/knowledge/research/papers/<citekey>.md`), then prints the file
+path and `zotero://select/library/items/<itemKey>`. It refuses to overwrite, and
+stops if a deck for the citekey already exists in either area (it never creates
+the other one).
 
 The note has frontmatter (`citekey`, `zotero-key`, `doi`, `review_status: pending`),
 a `zotero://select` link to the item, and
@@ -62,21 +96,36 @@ in the frontmatter (the template also sets `paginate` and a `style` that keeps
 text and figures on the slide). Obsidian's core Slides also shows the `---`
 separated slides, but content overflows more easily.
 
-`paper-link` requires the deck written by `paper-note` to exist. It adds one
-`linked_url` attachment titled "Obsidian deck" under the item, pointing to
-`obsidian://open?vault=<name>&file=private/knowledge/<citekey>` (vault-relative
-path, no extension, URL-encoded). Output is `created:` or `exists:` followed by
-the attachment key and the URL. Re-running is safe: if an attachment with the
-same URL already exists, nothing is written (and no authorization is requested).
+`paper-link` looks for the deck in both areas (an error if it is in neither or
+both) and keeps one `linked_url` attachment under the item, pointing to
+`obsidian://open?vault=<name>&file=<vault-relative path, no extension>` (slashes
+are not encoded). The existing attachment is the one titled "Obsidian deck" or whose
+URL starts with `obsidian://open?vault=<name>`. If its URL is the same nothing is
+written (`exists:`); if it differs the URL is updated with PATCH (`updated:`, e.g.
+after moving the deck between areas); if there is none it is created (`created:`).
+Updates use the same authorization, Keychain key and read-back verification as
+creation. Output:
+
+~~~
+created: <attachment key>        # or updated: / exists:
+item: zotero://select/library/items/<itemKey>
+pdf: zotero://open-pdf/library/items/<pdfKey>?page=1   # only if exactly one PDF
+deck: obsidian://open?vault=...&file=...
+~~~
+
 If writing fails, the URL is printed so it can be pasted into Zotero by hand.
+
+`paper-find --json` gives each result `zotero_key` and `pdf_key` (the PDF
+attachment key, `null` unless exactly one PDF attachment exists).
 
 Exit codes: `0` success, `1` no search results, `2` error (Zotero unreachable,
 citekey not found or ambiguous, vault unresolved, note exists).
 
 ## Notes on Zotero
 
-- `zotero://open-pdf` links need the PDF attachment's key, which `paper-note`
-  does not look up yet; add them by hand in the deck for now.
+- `zotero://open-pdf` links need the PDF attachment's key: take `pdf_key` from
+  `paper-find --json` or the `pdf:` line of `paper-link` (`paper-note` does not
+  look it up).
 - `item.search` is the only way to map a citekey to an item, so `paper-note`
   searches and requires an exact citekey match.
 - Writes to the local API (`POST /api/users/0/items`) need a key from
@@ -104,11 +153,26 @@ citekey not found or ambiguous, vault unresolved, note exists).
 ## Development
 
 ~~~sh
-uv sync
-uv run ruff check . && uv run ruff format --check .
-uv run pytest
+make install   # uv sync
+make all       # ruff check + mypy (strict) + pytest
 ~~~
+
+| Command | Description |
+|---|---|
+| `make install` | `uv sync` |
+| `make lint` | `ruff check .` |
+| `make format` | `ruff format .` |
+| `make type` | `mypy src` |
+| `make test` | `pytest` |
+| `make all` | lint + type + test |
+| `make update-charter` | Update the dev-charter subtree |
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and
+[AI_CONTEXT.md](AI_CONTEXT.md) for AI tool context.
 
 ## License
 
-MIT
+MIT License — see [LICENSE](LICENSE)
+
+---
+*This document has a Japanese canonical version [README-jp.md](README-jp.md). Update both in the same commit when editing.*

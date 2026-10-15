@@ -10,7 +10,8 @@ from pathlib import Path
 from .config import ConfigError, Vault, resolve_vault
 from .zotero import Paper, ZoteroError, resolve_citekey
 
-NOTE_DIR = Path("private") / "knowledge"
+NOTE_DIR = Path("knowledge") / "research" / "papers"
+PRIVATE_NOTE_DIR = Path("private") / NOTE_DIR
 _SAFE_CITEKEY = re.compile(r"^[A-Za-z0-9_.:-]+$")
 
 
@@ -73,23 +74,23 @@ def build_deck(paper: Paper) -> str:
     return "\n".join(lines)
 
 
-def create_note(paper: Paper, vault: Vault) -> Path:
+def find_decks(vault: Vault, citekey: str) -> list[Path]:
+    """Existing decks for the citekey in the normal and private areas."""
+    paths = (vault.root / d / f"{citekey}.md" for d in (NOTE_DIR, PRIVATE_NOTE_DIR))
+    return [p for p in paths if p.exists()]
+
+
+def create_note(paper: Paper, vault: Vault, private: bool = False) -> Path:
     if not _SAFE_CITEKEY.match(paper.citekey):
         raise ValueError(f"citekey is not usable as a file name: {paper.citekey!r}")
-    note_dir = vault.root / NOTE_DIR
+    existing = find_decks(vault, paper.citekey)
+    if existing:
+        raise FileExistsError(f"note already exists: {existing[0]}")
+    note_dir = vault.root / (PRIVATE_NOTE_DIR if private else NOTE_DIR)
     path = note_dir / f"{paper.citekey}.md"
-    if path.exists():
-        raise FileExistsError(f"note already exists: {path}")
     note_dir.mkdir(parents=True, exist_ok=True)
     path.write_text(build_deck(paper), encoding="utf-8")
     return path
-
-
-def obsidian_uri(vault: Vault, path: Path) -> str:
-    from urllib.parse import quote
-
-    rel = path.relative_to(vault.root).as_posix()
-    return f"obsidian://open?vault={quote(vault.name)}&file={quote(rel)}"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -99,17 +100,26 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("citekey", help="Better BibTeX citekey")
     parser.add_argument("--vault", help="vault root (overrides env and config)")
+    parser.add_argument(
+        "--vault-name",
+        help="vault name registered in Obsidian (overrides env and config)",
+    )
+    parser.add_argument(
+        "--private",
+        action="store_true",
+        help="create the deck under private/ instead of the normal area",
+    )
     args = parser.parse_args(argv)
 
     try:
-        vault = resolve_vault(args.vault)
+        vault = resolve_vault(args.vault, cli_name=args.vault_name)
         paper = resolve_citekey(args.citekey)
-        path = create_note(paper, vault)
+        path = create_note(paper, vault, args.private)
     except (ConfigError, ZoteroError, ValueError, FileExistsError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
     print(path)
-    print(obsidian_uri(vault, path))
+    print(paper.select_uri)
     return 0
 
 

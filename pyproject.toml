@@ -14,7 +14,11 @@ paper-note = "zotero_paper_tools.note:main"
 paper-link = "zotero_paper_tools.link:main"
 
 [dependency-groups]
-dev = ["pytest>=8", "ruff>=0.3"]
+dev = [
+    "pytest>=8",
+    "ruff>=0.3",
+    "mypy>=1.8",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -26,9 +30,17 @@ packages = ["src/zotero_paper_tools"]
 [tool.ruff]
 line-length = 88
 target-version = "py311"
+# docs/dev-charter/ is a git subtree we cannot edit directly (see
+# AI_CONTEXT.md); recent ruff formats fenced Python blocks in Markdown
+# by default, which would otherwise flag it.
+extend-exclude = ["docs/dev-charter"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
