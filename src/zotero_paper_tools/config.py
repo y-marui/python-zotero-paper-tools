@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import tomllib
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -32,7 +33,7 @@ class Vault:
     name: str
 
 
-def config_path(env: dict[str, str] | None = None) -> Path:
+def config_path(env: Mapping[str, str] | None = None) -> Path:
     env = os.environ if env is None else env
     if env.get(ENV_CONFIG):
         return Path(env[ENV_CONFIG]).expanduser()
@@ -61,8 +62,9 @@ def resolve_vault(
     config = _read_config(path)
 
     config_root = _to_root(config.get("vault_root"))
+    raw: object
     if cli_vault:
-        raw: str | None = cli_vault
+        raw = cli_vault
     elif env.get(ENV_VAULT):
         raw = env[ENV_VAULT]
     else:

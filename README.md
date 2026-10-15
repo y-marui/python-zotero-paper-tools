@@ -1,5 +1,23 @@
 # python-zotero-paper-tools
 
+> **This is the reference (English) version.**
+> The canonical (Japanese) version is [README-jp.md](README-jp.md).
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/y-marui/python-zotero-paper-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/y-marui/python-zotero-paper-tools/actions/workflows/ci.yml)
+[![Charter Check](https://github.com/y-marui/python-zotero-paper-tools/actions/workflows/dev-charter-check.yml/badge.svg)](https://github.com/y-marui/python-zotero-paper-tools/actions/workflows/dev-charter-check.yml)
+[![GitHub Sponsors](https://img.shields.io/github/sponsors/y-marui?style=social)](https://github.com/sponsors/y-marui)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-donate-yellow.svg)](https://www.buymeacoffee.com/y.marui)
+
+| Field | Value |
+|---|---|
+| Target | CLI tools for Zotero and Obsidian users |
+| Team | Solo |
+| Language | English |
+| License | MIT |
+| AI Tools | Claude Code / GitHub Copilot / Gemini CLI |
+| Runtime | Python ^3.11 (standard library only), macOS (Keychain) |
+
 Small CLI tools that connect papers in [Zotero](https://www.zotero.org/) with
 slide-style Markdown discussion notes (a "deck") in an Obsidian vault.
 
@@ -135,11 +153,26 @@ citekey not found or ambiguous, vault unresolved, note exists).
 ## Development
 
 ~~~sh
-uv sync
-uv run ruff check . && uv run ruff format --check .
-uv run pytest
+make install   # uv sync
+make all       # ruff check + mypy (strict) + pytest
 ~~~
+
+| Command | Description |
+|---|---|
+| `make install` | `uv sync` |
+| `make lint` | `ruff check .` |
+| `make format` | `ruff format .` |
+| `make type` | `mypy src` |
+| `make test` | `pytest` |
+| `make all` | lint + type + test |
+| `make update-charter` | Update the dev-charter subtree |
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and
+[AI_CONTEXT.md](AI_CONTEXT.md) for AI tool context.
 
 ## License
 
-MIT
+MIT License — see [LICENSE](LICENSE)
+
+---
+*This document has a Japanese canonical version [README-jp.md](README-jp.md). Update both in the same commit when editing.*

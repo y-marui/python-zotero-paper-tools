@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import sys
 import time
+from collections.abc import Callable
+from typing import Any
 from urllib.parse import quote
 
 from . import keystore
@@ -41,11 +43,13 @@ def locate_deck(vault: Vault, citekey: str) -> str:
     return found[0].relative_to(vault.root).with_suffix("").as_posix()
 
 
-def _data(child: dict) -> dict:
+def _data(child: dict[str, Any]) -> dict[str, Any]:
     return child.get("data") or {}
 
 
-def find_deck_attachment(children: list[dict], vault: Vault) -> dict | None:
+def find_deck_attachment(
+    children: list[dict[str, Any]], vault: Vault
+) -> dict[str, Any] | None:
     """The existing deck link: titled "Obsidian deck" or pointing into the vault."""
     prefix = f"obsidian://open?vault={quote(vault.name)}"
     for child in children:
@@ -59,7 +63,7 @@ def find_deck_attachment(children: list[dict], vault: Vault) -> dict | None:
     return None
 
 
-def _has_url(children: list[dict], url: str) -> dict | None:
+def _has_url(children: list[dict[str, Any]], url: str) -> dict[str, Any] | None:
     for child in children:
         d = _data(child)
         if d.get("linkMode") == "linked_url" and d.get("url") == url:
@@ -67,7 +71,7 @@ def _has_url(children: list[dict], url: str) -> dict | None:
     return None
 
 
-def attachment_item(paper: Paper, url: str) -> dict:
+def attachment_item(paper: Paper, url: str) -> dict[str, Any]:
     return {
         "itemType": "attachment",
         "linkMode": "linked_url",
@@ -77,7 +81,11 @@ def attachment_item(paper: Paper, url: str) -> dict:
     }
 
 
-def _with_key(api: LocalApi, write, warn=lambda m: None) -> None:
+def _with_key(
+    api: LocalApi,
+    write: Callable[[str], None],
+    warn: Callable[[str], None] = lambda m: None,
+) -> None:
     """Run ``write(key)`` with the Keychain key; (re)authorize when missing/rejected."""
     try:
         key = keystore.load()
@@ -114,9 +122,9 @@ def link_paper(
     paper: Paper,
     vault: Vault,
     url: str,
-    sleep=time.sleep,
-    warn=lambda m: None,
-) -> tuple[str, dict, str | None]:
+    sleep: Callable[[float], None] = time.sleep,
+    warn: Callable[[str], None] = lambda m: None,
+) -> tuple[str, dict[str, Any], str | None]:
     """Ensure the item carries the deck link.
 
     Returns (``exists`` | ``updated`` | ``created``, attachment, pdf key).

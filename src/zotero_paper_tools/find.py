@@ -7,7 +7,7 @@ import json
 import sys
 
 from .localapi import LocalApi
-from .zotero import ZoteroError, search
+from .zotero import Paper, ZoteroError, search
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -33,7 +33,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.json:
         api = LocalApi()
 
-        def pdf_key(p):
+        def pdf_key(p: Paper) -> str | None:
             try:
                 return api.pdf_key(p)
             except ZoteroError:

@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
+from http.client import HTTPResponse
+from typing import Any
 
 from . import zotero
 from .zotero import Paper, ZoteroError
@@ -25,9 +27,10 @@ class LocalApi:
         self.base_url = base_url or zotero.BASE_URL
         self._server_id: str | None = None
 
-    def _open(self, req: urllib.request.Request, timeout: float):
+    def _open(self, req: urllib.request.Request, timeout: float) -> HTTPResponse:
         try:
-            return urllib.request.urlopen(req, timeout=timeout)
+            resp: HTTPResponse = urllib.request.urlopen(req, timeout=timeout)
+            return resp
         except urllib.error.HTTPError as e:
             err = ZoteroError(f"{req.method} {req.full_url}: HTTP {e.code}")
             err.status = e.code  # type: ignore[attr-defined]
@@ -80,7 +83,12 @@ class LocalApi:
         return key, remember
 
     def _write(
-        self, method: str, path: str, body: object, key: str, extra: dict | None = None
+        self,
+        method: str,
+        path: str,
+        body: object,
+        key: str,
+        extra: dict[str, Any] | None = None,
     ) -> None:
         headers = {
             "Content-Type": "application/json",
@@ -98,11 +106,11 @@ class LocalApi:
         with self._open(req, WRITE_TIMEOUT) as resp:
             resp.read()
 
-    def post_items(self, library: str, items: list[dict], key: str) -> None:
+    def post_items(self, library: str, items: list[dict[str, Any]], key: str) -> None:
         self._write("POST", f"/api/{library}/items", items, key)
 
     def patch_item(
-        self, library: str, item_key: str, version: int, data: dict, key: str
+        self, library: str, item_key: str, version: int, data: dict[str, Any], key: str
     ) -> None:
         self._write(
             "PATCH",
@@ -112,7 +120,7 @@ class LocalApi:
             {"If-Unmodified-Since-Version": str(version)},
         )
 
-    def children(self, paper: Paper) -> list[dict]:
+    def children(self, paper: Paper) -> list[dict[str, Any]]:
         path = f"/api/{library_path(paper)}/items/{paper.item_key}/children"
         result = self.get(path)
         if not isinstance(result, list):
@@ -124,7 +132,7 @@ class LocalApi:
         return pdf_key_of(self.children(paper))
 
 
-def pdf_key_of(children: list[dict]) -> str | None:
+def pdf_key_of(children: list[dict[str, Any]]) -> str | None:
     keys = [
         c.get("key")
         for c in children
