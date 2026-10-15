@@ -57,7 +57,10 @@ a `zotero://select` link to the item, and
 slides separated by `---` lines (math as `$...$`). Figures go into `<citekey>-img/` and
 are embedded by relative link; the template only has an HTML comment showing how,
 so it contains no broken image links. The `<citekey>-img/` folder is not created by
-`paper-note`; create it when saving the first image. It renders with Obsidian's core Slides plugin.
+`paper-note`; create it when saving the first image. It is displayed by a Marp plugin (Marp Inline Preview), which needs `marp: true`
+in the frontmatter (the template also sets `paginate` and a `style` that keeps
+text and figures on the slide). Obsidian's core Slides also shows the `---`
+separated slides, but content overflows more easily.
 
 `paper-link` requires the deck written by `paper-note` to exist. It adds one
 `linked_url` attachment titled "Obsidian deck" under the item, pointing to

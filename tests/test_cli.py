@@ -29,6 +29,10 @@ def test_deck_structure():
     assert 'doi: "10.1103/dvxz-w9ts"' in text
     assert "zotero://select/library/items/ABCD1234" in text
     assert len(slides) >= 5
+    front = text.split("\n---\n")[0]
+    assert "marp: true" in front and "paginate: true" in front
+    assert "style: |\n  section { font-size: 22px; }" in front
+    assert "section img { max-height: 380px; }" in front
 
 
 def test_deck_has_no_broken_image_links():
