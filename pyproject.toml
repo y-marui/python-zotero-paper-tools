@@ -11,6 +11,7 @@ dependencies = []
 [project.scripts]
 paper-find = "zotero_paper_tools.find:main"
 paper-note = "zotero_paper_tools.note:main"
+paper-link = "zotero_paper_tools.link:main"
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.3"]
