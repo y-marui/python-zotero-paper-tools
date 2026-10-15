@@ -153,6 +153,39 @@ def test_changed_url_updates_existing_attachment(local_api, data):
     assert len(state.children) == 1 and state.children[0]["data"]["url"] == URL
 
 
+def test_vault_name_prefix_does_not_match_other_vault(local_api):
+    """A link into vault "v2" must not be taken for a link into vault "v"."""
+    api, state = local_api
+    other = "obsidian://open?vault=v2&file=x"
+    state.children.append(
+        {
+            "key": "V2ATT001",
+            "version": 3,
+            "data": {"linkMode": "linked_url", "title": "other", "url": other},
+        }
+    )
+    status, _, _ = link.link_paper(api, PAPER, VAULT, URL)
+    assert status == "created"
+    assert len(state.children) == 2
+    assert state.children[0]["data"]["url"] == other
+
+
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        ("obsidian://open?vault=v&file=a", True),
+        ("obsidian://open?file=a&vault=v", True),
+        ("obsidian://open?vault=v2&file=a", False),
+        ("obsidian://open?vault=vv", False),
+        ("obsidian://open?vault=v%20x&file=a", False),
+        ("https://example.com/?vault=v", False),
+        ("obsidian://search?vault=v", False),
+    ],
+)
+def test_points_into_vault_is_exact(url, expected):
+    assert link._points_into_vault(url, "v") is expected
+
+
 def test_unrelated_link_attachment_is_left_alone(local_api):
     api, state = local_api
     state.children.append(

@@ -53,8 +53,9 @@ Security and quality checks run automatically via `.pre-commit-config.yaml`.
 Setup:
 
 ```sh
-cp docs/dev-charter/.pre-commit-config.yaml .
-cp docs/dev-charter/.gitleaks.toml .
+# Use the checked-in .pre-commit-config.yaml and .gitleaks.toml as they are
+# (do not copy docs/dev-charter/.pre-commit-config.yaml over them: it is the dev-charter
+# maintainers' configuration and needs scripts that are not shipped here)
 # If core.hooksPath is already set, pre-commit install is not needed
 git config core.hooksPath 2>/dev/null \
   && echo "core.hooksPath already set" \

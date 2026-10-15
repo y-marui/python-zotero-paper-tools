@@ -126,6 +126,10 @@ jobs:
             echo "::error::security did not succeed (got: ${{ needs.security.result }})"
             exit 1
           fi
+          if [ "${{ needs.changes.result }}" != "success" ]; then
+            echo "::error::change detection did not succeed (got: ${{ needs.changes.result }})"
+            exit 1
+          fi
           if [ "${{ needs.changes.outputs.code }}" != "true" ]; then
             echo "docs/config-only change; nothing further to verify"
             exit 0

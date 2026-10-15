@@ -7,7 +7,7 @@ import sys
 import time
 from collections.abc import Callable
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import parse_qs, quote, urlsplit
 
 from . import keystore
 from .config import ConfigError, Vault, resolve_vault
@@ -51,16 +51,23 @@ def find_deck_attachment(
     children: list[dict[str, Any]], vault: Vault
 ) -> dict[str, Any] | None:
     """The existing deck link: titled "Obsidian deck" or pointing into the vault."""
-    prefix = f"obsidian://open?vault={quote(vault.name)}"
     for child in children:
         d = _data(child)
         if d.get("linkMode") != "linked_url":
             continue
-        if d.get("title") == ATTACHMENT_TITLE or str(d.get("url", "")).startswith(
-            prefix
+        if d.get("title") == ATTACHMENT_TITLE or _points_into_vault(
+            str(d.get("url", "")), vault.name
         ):
             return child
     return None
+
+
+def _points_into_vault(url: str, vault_name: str) -> bool:
+    """True if ``url`` is an obsidian://open link into exactly this vault."""
+    parts = urlsplit(url)
+    if parts.scheme != "obsidian" or parts.netloc != "open":
+        return False
+    return parse_qs(parts.query).get("vault") == [vault_name]
 
 
 def _has_url(children: list[dict[str, Any]], url: str) -> dict[str, Any] | None:
