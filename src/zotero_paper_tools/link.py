@@ -1,128 +1,68 @@
-"""paper-link: attach the deck's obsidian:// link to the Zotero item."""
+"""paper-link: attach (or update) the deck's obsidian:// link on the Zotero item."""
 
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 import time
-import urllib.error
-import urllib.request
 from urllib.parse import quote
 
-from . import keystore, zotero
+from . import keystore
 from .config import ConfigError, Vault, resolve_vault
 from .keystore import KeystoreError
-from .note import _SAFE_CITEKEY, NOTE_DIR
+from .localapi import LocalApi, library_path, pdf_key_of
+from .note import _SAFE_CITEKEY, find_decks
 from .zotero import Paper, ZoteroError, resolve_citekey
 
-# Reading back is cheap; writes may be slow while the authorization dialog is up.
-WRITE_TIMEOUT = 20.0
-AUTH_TIMEOUT = 120.0
 VERIFY_ATTEMPTS = 5
 VERIFY_INTERVAL = 1.0
 ATTACHMENT_TITLE = "Obsidian deck"
 
 
-def deck_uri(vault: Vault, citekey: str) -> str:
-    """``obsidian://open`` URI of the deck (vault-relative path, no extension)."""
-    rel = (NOTE_DIR / citekey).as_posix()
-    return f"obsidian://open?vault={quote(vault.name)}&file={quote(rel)}"
+class DeckError(Exception):
+    """Raised when the deck cannot be uniquely located."""
 
 
-def _library_path(paper: Paper) -> str:
-    return "users/0" if paper.library == "library" else paper.library
+def deck_uri(vault: Vault, rel_path: str) -> str:
+    """``obsidian://open`` URI for a vault-relative path without extension."""
+    return f"obsidian://open?vault={quote(vault.name)}&file={quote(rel_path)}"
 
 
-class LocalApi:
-    """Minimal client for the Zotero local API (``/api``)."""
-
-    def __init__(self, base_url: str | None = None):
-        self.base_url = base_url or zotero.BASE_URL
-        self._server_id: str | None = None
-
-    def _open(self, req: urllib.request.Request, timeout: float):
-        try:
-            return urllib.request.urlopen(req, timeout=timeout)
-        except urllib.error.HTTPError as e:
-            err = ZoteroError(f"{req.method} {req.full_url}: HTTP {e.code}")
-            err.status = e.code  # type: ignore[attr-defined]
-            raise err from e
-        except (urllib.error.URLError, TimeoutError, OSError) as e:
-            raise ZoteroError(f"{req.method} {req.full_url}: {e}") from e
-
-    def get(self, path: str) -> object:
-        req = urllib.request.Request(
-            self.base_url + path, headers={"Zotero-API-Version": "3"}
+def locate_deck(vault: Vault, citekey: str) -> str:
+    """Vault-relative path (no extension) of the deck in normal or private area."""
+    found = find_decks(vault, citekey)
+    if not found:
+        raise DeckError(f"deck not found (run paper-note first): {citekey}")
+    if len(found) > 1:
+        raise DeckError(
+            "deck exists in both normal and private areas: "
+            + ", ".join(str(p) for p in found)
         )
-        with self._open(req, zotero.TIMEOUT) as resp:
-            self._server_id = resp.headers.get("Zotero-Server-ID") or self._server_id
-            try:
-                return json.load(resp)
-            except json.JSONDecodeError as e:
-                raise ZoteroError(f"GET {path}: invalid JSON") from e
-
-    def server_id(self) -> str:
-        if self._server_id is None:
-            self.get("/api/users/0/items?limit=1")
-        if not self._server_id:
-            raise ZoteroError("Zotero did not report Zotero-Server-ID")
-        return self._server_id
-
-    def authorize(self, app_name: str) -> tuple[str, bool]:
-        """Ask Zotero for a write key; returns (key, remember).
-
-        Shows a dialog unless a previous "always allow" is on record. With
-        ``remember`` false the key is single-use.
-        """
-        req = urllib.request.Request(
-            self.base_url + "/api/local/authorize",
-            data=json.dumps({"appName": app_name}).encode(),
-            headers={
-                "Content-Type": "application/json",
-                "Zotero-Server-ID": self.server_id(),
-            },
-            method="POST",
-        )
-        with self._open(req, AUTH_TIMEOUT) as resp:
-            try:
-                payload = json.load(resp)
-                key = payload.get("key")
-                remember = bool(payload.get("remember"))
-            except (json.JSONDecodeError, AttributeError) as e:
-                raise ZoteroError("unexpected authorization response") from e
-        if not key:
-            raise ZoteroError("authorization was not granted")
-        return key, remember
-
-    def post_items(self, library: str, items: list[dict], key: str) -> None:
-        req = urllib.request.Request(
-            f"{self.base_url}/api/{library}/items",
-            data=json.dumps(items).encode(),
-            headers={
-                "Content-Type": "application/json",
-                "Zotero-API-Version": "3",
-                "Zotero-API-Key": key,
-                "Zotero-Server-ID": self.server_id(),
-            },
-            method="POST",
-        )
-        with self._open(req, WRITE_TIMEOUT) as resp:
-            resp.read()
-
-    def children(self, paper: Paper) -> list[dict]:
-        path = f"/api/{_library_path(paper)}/items/{paper.item_key}/children"
-        result = self.get(path)
-        if not isinstance(result, list):
-            raise ZoteroError(f"unexpected children response for {paper.item_key}")
-        return [c for c in result if isinstance(c, dict)]
+    return found[0].relative_to(vault.root).with_suffix("").as_posix()
 
 
-def find_link(api: LocalApi, paper: Paper, url: str) -> dict | None:
-    """Return the existing linked_url attachment with this url, if any."""
-    for child in api.children(paper):
-        data = child.get("data") or {}
-        if data.get("linkMode") == "linked_url" and data.get("url") == url:
+def _data(child: dict) -> dict:
+    return child.get("data") or {}
+
+
+def find_deck_attachment(children: list[dict], vault: Vault) -> dict | None:
+    """The existing deck link: titled "Obsidian deck" or pointing into the vault."""
+    prefix = f"obsidian://open?vault={quote(vault.name)}"
+    for child in children:
+        d = _data(child)
+        if d.get("linkMode") != "linked_url":
+            continue
+        if d.get("title") == ATTACHMENT_TITLE or str(d.get("url", "")).startswith(
+            prefix
+        ):
+            return child
+    return None
+
+
+def _has_url(children: list[dict], url: str) -> dict | None:
+    for child in children:
+        d = _data(child)
+        if d.get("linkMode") == "linked_url" and d.get("url") == url:
             return child
     return None
 
@@ -137,10 +77,8 @@ def attachment_item(paper: Paper, url: str) -> dict:
     }
 
 
-def _post_with_key(
-    api: LocalApi, paper: Paper, item: dict, warn=lambda m: None
-) -> None:
-    """POST using the Keychain key; (re)authorize when missing or rejected."""
+def _with_key(api: LocalApi, write, warn=lambda m: None) -> None:
+    """Run ``write(key)`` with the Keychain key; (re)authorize when missing/rejected."""
     try:
         key = keystore.load()
     except KeystoreError as e:
@@ -163,34 +101,57 @@ def _post_with_key(
 
     if key is None:
         key = authorize()
-    path = _library_path(paper)
     try:
-        api.post_items(path, [item], key)
+        write(key)
     except ZoteroError as e:
         if getattr(e, "status", None) not in (401, 403):
             raise
-        api.post_items(path, [item], authorize())
+        write(authorize())
 
 
 def link_paper(
-    api: LocalApi, paper: Paper, url: str, sleep=time.sleep, warn=lambda m: None
-) -> tuple[str, dict]:
-    """Ensure the item has the link. Returns (``exists`` | ``created``, attachment)."""
-    existing = find_link(api, paper, url)
+    api: LocalApi,
+    paper: Paper,
+    vault: Vault,
+    url: str,
+    sleep=time.sleep,
+    warn=lambda m: None,
+) -> tuple[str, dict, str | None]:
+    """Ensure the item carries the deck link.
+
+    Returns (``exists`` | ``updated`` | ``created``, attachment, pdf key).
+    """
+    children = api.children(paper)
+    pdf = pdf_key_of(children)
+    existing = _has_url(children, url)
     if existing:
-        return "exists", existing
+        return "exists", existing, pdf
+
+    stale = find_deck_attachment(children, vault)
+    lib = library_path(paper)
+    if stale:
+        status = "updated"
+        version = int(stale.get("version") or _data(stale).get("version") or 0)
+
+        def write(key: str) -> None:
+            api.patch_item(lib, stale["key"], version, {"url": url}, key)
+    else:
+        status = "created"
+
+        def write(key: str) -> None:
+            api.post_items(lib, [attachment_item(paper, url)], key)
 
     write_error: ZoteroError | None = None
     try:
-        _post_with_key(api, paper, attachment_item(paper, url), warn)
+        _with_key(api, write, warn)
     except ZoteroError as e:
         # The write often succeeds without an HTTP response; verify by reading.
         write_error = e
 
     for attempt in range(VERIFY_ATTEMPTS):
-        created = find_link(api, paper, url)
-        if created:
-            return "created", created
+        found = _has_url(api.children(paper), url)
+        if found:
+            return status, found, pdf
         if attempt < VERIFY_ATTEMPTS - 1:
             sleep(VERIFY_INTERVAL)
     detail = f" ({write_error})" if write_error else ""
@@ -203,12 +164,16 @@ def main(argv: list[str] | None = None) -> int:
         description="Attach the deck's obsidian:// link to the Zotero item.",
     )
     parser.add_argument("citekey", nargs="?", help="Better BibTeX citekey")
+    parser.add_argument("--vault", help="vault root (overrides env and config)")
+    parser.add_argument(
+        "--vault-name",
+        help="vault name registered in Obsidian (overrides env and config)",
+    )
     parser.add_argument(
         "--forget-key",
         action="store_true",
         help="delete the stored Zotero API key from the Keychain and exit",
     )
-    parser.add_argument("--vault", help="vault root (overrides env and config)")
     args = parser.parse_args(argv)
 
     if args.forget_key:
@@ -229,21 +194,23 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if not _SAFE_CITEKEY.match(args.citekey):
             raise ValueError(f"citekey is not usable as a file name: {args.citekey!r}")
-        vault = resolve_vault(args.vault)
-        deck = vault.root / NOTE_DIR / f"{args.citekey}.md"
-        if not deck.is_file():
-            raise FileNotFoundError(f"deck not found (run paper-note first): {deck}")
+        vault = resolve_vault(args.vault, cli_name=args.vault_name)
+        rel = locate_deck(vault, args.citekey)
         paper = resolve_citekey(args.citekey)
-        url = deck_uri(vault, paper.citekey)
-        status, attachment = link_paper(LocalApi(), paper, url, warn=warn)
-    except (ConfigError, ZoteroError, ValueError, FileNotFoundError) as e:
+        url = deck_uri(vault, rel)
+        status, attachment, pdf = link_paper(LocalApi(), paper, vault, url, warn=warn)
+    except (ConfigError, ZoteroError, DeckError, ValueError) as e:
         print(f"error: {e}", file=sys.stderr)
         if url and isinstance(e, ZoteroError):
             print(
                 f"to attach by hand, add this link to the item: {url}", file=sys.stderr
             )
         return 2
-    print(f"{status}: {attachment.get('key', '')}\t{url}")
+    print(f"{status}: {attachment.get('key', '')}")
+    print(f"item: {paper.select_uri}")
+    if pdf:
+        print(f"pdf: zotero://open-pdf/{paper.library}/items/{pdf}?page=1")
+    print(f"deck: {url}")
     return 0
 
 
