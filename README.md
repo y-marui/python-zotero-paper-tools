@@ -15,7 +15,7 @@
 | Team | Solo |
 | Language | English |
 | License | MIT |
-| AI Tools | Claude Code / GitHub Copilot / Gemini CLI |
+| AI Tools | Claude Code / GitHub Copilot |
 | Runtime | Python ^3.11 (standard library only), macOS (Keychain) |
 
 Small CLI tools that connect papers in [Zotero](https://www.zotero.org/) with
