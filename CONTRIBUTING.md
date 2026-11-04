@@ -59,7 +59,7 @@ Setup:
 # If core.hooksPath is already set, pre-commit install is not needed
 git config core.hooksPath 2>/dev/null \
   && echo "core.hooksPath already set" \
-  || pre-commit install
+  || { pre-commit install; pre-commit install --hook-type pre-push; }
 pre-commit run --all-files  # verify
 ```
 
