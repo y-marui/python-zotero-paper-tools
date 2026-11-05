@@ -25,16 +25,6 @@ Zotero is accessed **only through its local API** (`http://localhost:23119`)
 and the [Better BibTeX](https://retorque.re/zotero-better-bibtex/) JSON-RPC
 endpoint. The Zotero Web API is never used. Python 3.11+, standard library only.
 
-## Commands
-
-| Command | Status | What it does |
-| --- | --- | --- |
-| `paper-find <query>` | available | Search Zotero and print citekeys (`--json` adds `zotero_key` and `pdf_key`) |
-| `paper-note <citekey>` | available | Create the deck in the vault |
-| `paper-link <citekey>` | available | Attach an `obsidian://` link to the Zotero item |
-
-Requirements: Zotero running with Better BibTeX installed.
-
 ## Install
 
 ~~~sh
@@ -69,6 +59,16 @@ Set `vault_name` when the name registered in Obsidian differs from the directory
 vault_root = "~/path/to/vault"   # relative paths are taken from $HOME
 vault_name = "my-vault"          # name registered in Obsidian; defaults to the directory name
 ~~~
+
+## Commands
+
+| Command | Status | What it does |
+| --- | --- | --- |
+| `paper-find <query>` | available | Search Zotero and print citekeys (`--json` adds `zotero_key` and `pdf_key`) |
+| `paper-note <citekey>` | available | Create the deck in the vault |
+| `paper-link <citekey>` | available | Attach an `obsidian://` link to the Zotero item |
+
+Requirements: Zotero running with Better BibTeX installed.
 
 ## Usage
 

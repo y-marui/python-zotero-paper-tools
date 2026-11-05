@@ -25,16 +25,6 @@ Zotero へは**ローカル API のみ**（`http://localhost:23119`）と
 [Better BibTeX](https://retorque.re/zotero-better-bibtex/) の JSON-RPC を通じて
 アクセスします。Zotero Web API は使いません。
 
-## Commands
-
-| コマンド | 状態 | 内容 |
-| --- | --- | --- |
-| `paper-find <query>` | 利用可 | Zotero を検索して citekey を表示（`--json` で `zotero_key` と `pdf_key` も出力） |
-| `paper-note <citekey>` | 利用可 | Vault に deck を作成 |
-| `paper-link <citekey>` | 利用可 | Zotero のアイテムに `obsidian://` リンクを添付 |
-
-必要なもの: Better BibTeX を入れた Zotero を起動していること。
-
 ## Install
 
 ~~~sh
@@ -68,6 +58,16 @@ Obsidian に登録した名前がディレクトリ名と異なる場合は `vau
 vault_root = "~/path/to/vault"   # 相対パスは $HOME 基準
 vault_name = "my-vault"          # Obsidian に登録した名前（省略時はディレクトリ名）
 ~~~
+
+## Commands
+
+| コマンド | 状態 | 内容 |
+| --- | --- | --- |
+| `paper-find <query>` | 利用可 | Zotero を検索して citekey を表示（`--json` で `zotero_key` と `pdf_key` も出力） |
+| `paper-note <citekey>` | 利用可 | Vault に deck を作成 |
+| `paper-link <citekey>` | 利用可 | Zotero のアイテムに `obsidian://` リンクを添付 |
+
+必要なもの: Better BibTeX を入れた Zotero を起動していること。
 
 ## Usage
 
