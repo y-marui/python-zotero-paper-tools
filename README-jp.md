@@ -15,7 +15,7 @@
 | チーム | 個人 |
 | 言語 | 英語（コード・README）／日本語（正本の README と AI_CONTEXT） |
 | ライセンス | MIT |
-| AI ツール | Claude Code / GitHub Copilot / Gemini CLI |
+| AI ツール | Claude Code / GitHub Copilot |
 | 実行環境 | Python 3.11 以上（標準ライブラリのみ）、macOS（Keychain） |
 
 [Zotero](https://www.zotero.org/) の論文と、Obsidian Vault 内のスライド形式の
